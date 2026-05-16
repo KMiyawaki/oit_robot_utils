@@ -1,0 +1,131 @@
+cmake_minimum_required(VERSION 3.8)
+project(oit_cybergear)
+
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# =============================================================================
+# 1. 依存パッケージの検索 (必要に応じてコメントを外す)
+# =============================================================================
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+
+# 【A: メッセージ生成パッケージにする場合】
+# find_package(rosidl_default_generators REQUIRED)
+
+# 【B: Pythonモジュール/Pythonノードを同梱する場合】
+find_package(ament_cmake_python REQUIRED)
+
+# 【C: その他一般的なROS 2 / 外部ライブラリ】
+find_package(angles REQUIRED)
+find_package(can_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(oit_cybergear_msgs REQUIRED)
+
+
+# =============================================================================
+# 2. メッセージ・インターフェースの生成 【A】
+# =============================================================================
+# ※ メッセージ専用、またはメッセージ同梱パッケージにする場合のみ有効化
+# rosidl_generate_interfaces(${PROJECT_NAME}
+#   "msg/MyMsg.msg"
+#   DEPENDENCIES std_msgs
+# )
+
+
+# =============================================================================
+# 3. C++ 共有ライブラリのビルド設定 【C-1】
+# =============================================================================
+# ※ 他のパッケージやノードからリンクされるライブラリ（.so）を作る場合
+# include_directories(include)
+# add_library(${PROJECT_NAME}_lib SHARED
+#   src/my_library_code.cpp
+# )
+# ament_target_dependencies(${PROJECT_NAME}_lib rclcpp std_msgs)
+
+# ➔ 自作ライブラリのヘッダー(.hpp)に外部（OpenCV等）の型を露出させるなら【PUBLIC】
+# ➔ 内部の.cppだけで隠れて使う（ヘッダーを汚染しない）なら【PRIVATE】
+# target_link_libraries(${PROJECT_NAME}_lib PUBLIC ${OpenCV_LIBS})
+
+
+# =============================================================================
+# 4. C++ 実行ファイル(ノード)のビルド設定 【C-2】
+# =============================================================================
+include_directories(include)
+
+set(MY_PACKAGE_SRCS
+  "src/cybergear_motor.cpp"
+  "src/cybergear_motor_manager.cpp"
+  "src/utils.cpp"
+)
+
+# --- 実行ノードの定義 ---
+add_executable(cybergear_motor_manager_node src/cybergear_motor_manager_node.cpp  ${MY_PACKAGE_SRCS})
+ament_target_dependencies(cybergear_motor_manager_node rclcpp std_msgs angles oit_cybergear_msgs can_msgs)
+
+# 【自作の共有ライブラリを使う場合】上で作ったライブラリをリンクする
+# target_link_libraries(my_node PRIVATE ${PROJECT_NAME}_lib)
+
+# ROS 2以外の一般C++ライブラリ（OpenCV等）を個別にリンクする。
+# ➔ ノード（実行ファイル）の場合は、他からリンクされない終着点なので常に【PRIVATE】
+# target_link_libraries(my_node PRIVATE ${OpenCV_LIBS})
+
+
+# =============================================================================
+# 5. インストール設定 (コピペ用ターゲットの配置)
+# =============================================================================
+
+# (1) C++ 実行バイナリ(ノード)のインストール
+install(TARGETS cybergear_motor_manager_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# (2) C++ 共有ライブラリ(.so)およびヘッダーのインストール 【C-1】
+# install(TARGETS ${PROJECT_NAME}_lib
+#   EXPORT export_${PROJECT_NAME}_lib
+#   ARCHIVE DESTINATION lib
+#   LIBRARY DESTINATION lib
+#   RUNTIME DESTINATION bin
+# )
+# install(DIRECTORY include/
+#   DESTINATION include/
+# )
+
+# (3) Pythonライブラリ(モジュール)のインストール 【B】
+# ※ scripts/ 内のPythonノード等から `import <パッケージ名>` で呼べる自作モジュールを配置する場合に有効化
+# 「メッセージ生成」と、この「Pythonライブラリインストール」を同じパッケージ内で【同時に有効化】すると、ビルドエラーになります。
+# ament_python_install_package(${PROJECT_NAME})
+
+# (4) 実行用スクリプト (scripts/*.py, *.sh) のインストール 【B】
+# file(GLOB ALL_SCRIPTS "scripts/*.sh" "scripts/*.py")
+# if(ALL_SCRIPTS)
+#   install(PROGRAMS
+#     ${ALL_SCRIPTS}
+#     DESTINATION lib/${PROJECT_NAME}
+#   )
+# endif()
+
+# (5) 設定ファイル・ローンチファイルのインストール
+# install(DIRECTORY config launch
+#   DESTINATION share/${PROJECT_NAME}
+# )
+
+
+# =============================================================================
+# 6. エクスポートとパッケージ化 (締め)
+# =============================================================================
+
+# 【C-1: 共有ライブラリを作った場合】下流パッケージにライブラリの存在をエクスポートする
+# ament_export_targets(export_${PROJECT_NAME}_lib HAS_LIBRARY_TARGET)
+
+# 他のパッケージがこのパッケージを利用する際の、依存関係の引き継ぎ設定
+ament_export_dependencies(rclcpp std_msgs angles oit_cybergear_msgs can_msgs)
+
+# 【A: メッセージ生成を含んでおり、下流パッケージでも使わせる場合】
+# ament_export_dependencies(rosidl_default_runtime)
+
+ament_package()
