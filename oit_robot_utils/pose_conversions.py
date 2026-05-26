@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import rclpy
-from geometry_msgs.msg import Pose2D, PoseStamped, Quaternion
+from geometry_msgs.msg import Pose2D, PoseStamped
 from tf2_ros import Duration, tf2_ros
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
@@ -82,5 +82,5 @@ class TFPoseGetter:
             pose.theta = get_yaw_from_quaternion(trans.transform.rotation)
             return pose
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            self.node.get_logger().debug(f"TF lookup failed: {e}")
+            self.node.get_logger().debug(f'TF lookup failed: {e}')
             return None
