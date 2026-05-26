@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import rclpy
-from geometry_msgs.msg import Pose2D
+from geometry_msgs.msg import Pose2D, PoseStamped, Quaternion
 from tf2_ros import Duration, tf2_ros
-from tf_transformations import euler_from_quaternion
+from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
 
 def get_yaw_from_quaternion(orientation):
@@ -30,6 +30,22 @@ def velocity2d_from_odom(msg):
     Odometryメッセージから速度を抽出する
     """
     return (msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.angular.z)
+
+
+def pose_stamped_from(x, y, yaw, frame_id='map'):
+    """
+    (x, y, yaw) から PoseStampedメッセージを生成する
+    """
+    ps = PoseStamped()
+    ps.header.frame_id = frame_id
+    ps.pose.position.x = x
+    ps.pose.position.y = y
+    q = quaternion_from_euler(0, 0, yaw)
+    ps.pose.orientation.x = q[0]
+    ps.pose.orientation.y = q[1]
+    ps.pose.orientation.z = q[2]
+    ps.pose.orientation.w = q[3]
+    return ps
 
 
 def pose2d_from_amcl(msg):
