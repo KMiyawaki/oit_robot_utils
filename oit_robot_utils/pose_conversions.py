@@ -32,11 +32,12 @@ def velocity2d_from_odom(msg):
     return (msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.angular.z)
 
 
-def pose_stamped_from(x, y, yaw, frame_id='map'):
+def pose_stamped_from(x, y, yaw, time_msg, frame_id='map'):
     """
     (x, y, yaw) から PoseStampedメッセージを生成する
     """
     ps = PoseStamped()
+    ps.header.stamp = time_msg
     ps.header.frame_id = frame_id
     ps.pose.position.x = x
     ps.pose.position.y = y
