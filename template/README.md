@@ -7,9 +7,11 @@
 
 ## パッケージの新規作成 (ros2 pkg create)
 
-パッケージを作る際は、**「ロジック（C++/Python）」**と**「カスタムメッセージ（_msgs）」**でパッケージを分けるのが鉄則です（Humbleのビルドバグ回避のため）。
+パッケージを作る際は、**「ロジック（`C++/Python`）」**と**「カスタムメッセージ（`_msgs`）」**でパッケージを分けるのが鉄則です（`Humble`のビルドバグ回避のため）。
 
 ### 通常のC++パッケージを作る場合
+
+たとえ、`Python`のプログラムを作成する場合でも`ament_cmake`、つまり、この方法でパッケージ作成するほうがパッケージ内のフォルダ構成等、圧倒的に簡単になりますので、特段の事情がなければこの方法で作成してください。
 
 ```bash
 ros2 pkg create --build-type ament_cmake --node-name my_node my_package
@@ -38,6 +40,11 @@ ros2 pkg create --build-type ament_cmake my_package_msgs
 ## ビルドコマンド
 
 自パッケージのルートに`build.sh`を配置し、`./build.sh`を実行してください。
+
+- `./build.sh` : 自パッケージのみをビルド（推奨）
+- `./build.sh -a` : ワークスペース全体をビルド
+- `./build.sh -d` : デバッグシンボル付きでビルド
+- `./build.sh -r` : 自パッケージのビルド結果をクリアしてから再ビルド
 
 ## 実行とデバッグ (ros2 run / launch)
 
