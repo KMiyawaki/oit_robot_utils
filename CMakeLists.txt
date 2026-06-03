@@ -63,6 +63,6 @@ endif()
 # -----------------------------------------------------------------------------
 
 # 他のパッケージがこのメッセージや依存関係を利用できるようにする
-ament_export_dependencies(rclcpp std_msgs can_msgs angles rosidl_default_runtime)
+ament_export_dependencies(rclcpp std_msgs angles rosidl_default_runtime)
 
 ament_package()
