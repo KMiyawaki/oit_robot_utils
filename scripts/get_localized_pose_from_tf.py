@@ -4,20 +4,8 @@ import rclpy
 from rclpy.node import Node
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
-import sys, math
-
-def quat_to_euler(x, y, z, w):
-    # returns roll, pitch, yaw (rad)
-    t0 = +2.0 * (w * x + y * z)
-    t1 = +1.0 - 2.0 * (x * x + y * y)
-    roll = math.atan2(t0, t1)
-    t2 = +2.0 * (w * y - z * x)
-    t2 = max(-1.0, min(1.0, t2))
-    pitch = math.asin(t2)
-    t3 = +2.0 * (w * z + x * y)
-    t4 = +1.0 - 2.0 * (y * y + z * z)
-    yaw = math.atan2(t3, t4)
-    return roll, pitch, yaw
+import sys
+from tf_transformations import euler_from_quaternion
 
 class TfEchoNode(Node):
     def __init__(self, parent_frame, child_frame, rate_hz=10.0):
@@ -36,7 +24,7 @@ class TfEchoNode(Node):
             secs = ts.sec + ts.nanosec * 1e-9
             t = tf.transform.translation
             q = tf.transform.rotation
-            roll, pitch, yaw = quat_to_euler(q.x, q.y, q.z, q.w)
+            roll, pitch, yaw = euler_from_quaternion([q.x, q.y, q.z, q.w])
             print(f"At time {secs:.9f}")
             print(f"Translation: [{t.x:.6f}, {t.y:.6f}, {t.z:.6f}]")
             print(f"Rotation (quat): [{q.x:.6f}, {q.y:.6f}, {q.z:.6f}, {q.w:.6f}]")
