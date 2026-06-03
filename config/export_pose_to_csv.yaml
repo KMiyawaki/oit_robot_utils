@@ -1,0 +1,24 @@
+# Parameters for the pose_to_csv exporter node
+export_pose_to_csv:
+  ros__parameters:
+    # Output CSV filename. If empty, a timestamped name is generated in oit_robot_utils/csv.
+    # Can be an absolute path, or a filename to be saved in output_dir.
+    # If empty, a timestamped name is generated.
+    output_name: ""
+    # Directory to save the CSV file. A '~' will be expanded to the user's home directory.
+    # If output_name is an absolute path, this is ignored.
+    output_dir: "~/ros2_ws/src/oit_robot_utils/csv"
+    # How many pose rows to record into the CSV. Set to 0 for infinite capture.
+    count: 0
+    # Minimum distance (in meters) from the last point to record the next one.
+    distance_threshold: 0.1
+    # Timeout in seconds to wait for the first TF transform.
+    timeout: 10.0
+    # Default threshold value for the waypoint in the CSV.
+    waypoint_threshold: 1.5
+    # Append to existing CSV file instead of creating a new one.
+    append: false
+    # Parent frame for TF lookup.
+    parent_frame: "map"
+    # Child frame for TF lookup.
+    child_frame: "base_link"

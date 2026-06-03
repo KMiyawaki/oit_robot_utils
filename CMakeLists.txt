@@ -54,9 +54,9 @@ if(ALL_SCRIPTS)
 endif()
 
 # 設定ファイル・ローンチファイルのインストール
-# install(DIRECTORY config launch
-#   DESTINATION share/${PROJECT_NAME}
-# )
+install(DIRECTORY config launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 # -----------------------------------------------------------------------------
 # 5. エクスポートとパッケージ化
