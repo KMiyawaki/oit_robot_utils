@@ -1,6 +1,7 @@
 # python
 #!/usr/bin/env python3
 import rclpy
+from rclpy.time import Time
 from rclpy.node import Node
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
@@ -18,7 +19,7 @@ class TfEchoNode(Node):
 
     def timer_cb(self):
         try:
-            now = rclpy.time.Time()
+            now = Time()
             tf = self.buffer.lookup_transform(self.parent, self.child, now)
             ts = tf.header.stamp
             secs = ts.sec + ts.nanosec * 1e-9

@@ -21,6 +21,9 @@ msg/_*.py
 *.dox
 *.wikidoc
 
+# Ignore generated CSV folder
+csv/
+
 # eclipse stuff
 .project
 .cproject
