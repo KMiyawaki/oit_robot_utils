@@ -83,4 +83,6 @@ class TFPoseGetter:
             return pose
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             self.node.get_logger().debug(f'TF lookup failed: {e}')
+            print(f'{type(e)}')
+            print(f'TF lookup failed: {e}')
             return None

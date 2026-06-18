@@ -8,10 +8,10 @@ import os
 import sys
 import time
 from typing import Optional
+from oit_robot_utils.pose_conversions import *
 
 import rclpy
 from rclpy.node import Node
-from rclpy.time import Time
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 
@@ -23,30 +23,17 @@ DEFAULT_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'csv')
 class PoseCsvExporter(Node):
     def __init__(self, parent_frame: str = 'map', child_frame: str = 'base_link'):
         super().__init__('export_pose_to_csv')
-        self.parent_frame = parent_frame
-        self.child_frame = child_frame
         self.buffer = Buffer()
-        self.tl = TransformListener(self.buffer, self)
+        # Attach a TransformListener to populate the buffer using this node
+        self._tl = TransformListener(self.buffer, self)
+        # Use this node for the pose getter so spin_once operates on the same node
+        self.pose_getter = TFPoseGetter(self, self.buffer, from_frame=parent_frame, to_frame=child_frame)
 
-    def lookup_pose(self):
-        try:
-            now = Time()
-            trans = self.buffer.lookup_transform(
-                self.parent_frame,
-                self.child_frame,
-                now,
-            )
-            ts = trans.header.stamp
-            secs = ts.sec + ts.nanosec * 1e-9
-            return trans.transform.translation.x, trans.transform.translation.y, secs
-        except Exception as e:
-            self.get_logger().debug(f'TF lookup failed: {e}')
-            return None
 
     def wait_for_pose(self, timeout_sec: float = 10.0):
         deadline = time.monotonic() + timeout_sec
         while rclpy.ok() and time.monotonic() < deadline:
-            pose = self.lookup_pose()
+            pose = self.pose_getter.get_pose()
             if pose is not None:
                 return pose
             rclpy.spin_once(self, timeout_sec=0.5)
@@ -167,16 +154,15 @@ def main(args=None):
                 row_id = next_id
                 print(f'Infinite capture mode started. Press Ctrl+C to stop.')
                 # 最初の位置で1行書く
-                x, y, ts = pose
                 writer.writerow([
                     row_id,
                     'goto_point',
-                    f'{x:.6f}',
-                    f'{y:.6f}',
+                    f'{pose.x:.6f}',
+                    f'{pose.y:.6f}',
                     f'{DEFAULT_THRESHOLD:.6f}',
                 ])
                 csvfile.flush()
-                print(f'Waypoint {row_id}: x={x:.6f}, y={y:.6f} (ts={ts:.6f})')
+                print(f'Waypoint {row_id}: x={pose.x:.6f}, y={pose.y:.6f}')
                 row_id += 1
                 
                 # その後のループで定期取得
@@ -187,16 +173,15 @@ def main(args=None):
                         if new_pose is None:
                             print('Warning: lost TF transform, retrying...', file=sys.stderr)
                             continue
-                        x, y, ts = new_pose
                         writer.writerow([
                             row_id,
                             'goto_point',
-                            f'{x:.6f}',
-                            f'{y:.6f}',
+                            f'{new_pose.x:.6f}',
+                            f'{new_pose.y:.6f}',
                             f'{DEFAULT_THRESHOLD:.6f}',
                         ])
                         csvfile.flush()
-                        print(f'Waypoint {row_id}: x={x:.6f}, y={y:.6f} (ts={ts:.6f})')
+                        print(f'Waypoint {row_id}: x={new_pose.x:.6f}, y={new_pose.y:.6f}')
                         row_id += 1
                     except KeyboardInterrupt:
                         break
@@ -209,15 +194,14 @@ def main(args=None):
                     if pose is None:
                         print('Error: lost TF transform while capturing rows.', file=sys.stderr)
                         return 3
-                    x, y, ts = pose
                     writer.writerow([
                         row_id,
                         'goto_point',
-                        f'{x:.6f}',
-                        f'{y:.6f}',
+                        f'{pose.x:.6f}',
+                        f'{pose.y:.6f}',
                         f'{DEFAULT_THRESHOLD:.6f}',
                     ])
-                    print(f'Wrote waypoint {row_id}: x={x:.6f}, y={y:.6f}, threshold={DEFAULT_THRESHOLD:.2f} (ts={ts:.6f})')
+                    print(f'Wrote waypoint {row_id}: x={pose.x:.6f}, y={pose.y:.6f}, threshold={DEFAULT_THRESHOLD:.2f}')
 
         print(f'Created/updated CSV: {filename}')
         return 0
