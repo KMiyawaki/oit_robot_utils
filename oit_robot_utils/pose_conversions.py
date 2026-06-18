@@ -61,19 +61,21 @@ def pose2d_from_amcl(msg):
 
 
 class TFPoseGetter:
-    def __init__(self, node, tf_buffer, from_frame='map', to_frame='base_link', timeout_sec=5):
+    def __init__(self, node, tf_buffer, from_frame='map', to_frame='base_link', timeout_sec=0.01):
         self.node = node
         self.tf_buffer = tf_buffer
         self.from_frame = from_frame
         self.to_frame = to_frame
         self.timeout_sec = timeout_sec
 
-    def get_pose(self):
+    def get_pose(self, time=None):
         try:
+            if time is None:
+                time = rclpy.time.Time()
             trans = self.tf_buffer.lookup_transform(
                 self.from_frame,
                 self.to_frame,
-                rclpy.time.Time(seconds=0),
+                time,
                 timeout=Duration(seconds=self.timeout_sec)
             )
             pose = Pose2D()
@@ -82,7 +84,6 @@ class TFPoseGetter:
             pose.theta = get_yaw_from_quaternion(trans.transform.rotation)
             return pose
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            self.node.get_logger().debug(f'TF lookup failed: {e}')
-            print(f'{type(e)}')
-            print(f'TF lookup failed: {e}')
+            self.node.get_logger().info(
+                f"lookup_transform failed: {e}", throttle_duration_sec=1.0)
             return None
