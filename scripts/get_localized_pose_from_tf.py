@@ -1,5 +1,6 @@
-# python
-#!/usr/bin/env python3
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import rclpy
 from rclpy.time import Time
 from rclpy.node import Node
@@ -7,6 +8,7 @@ from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
 import sys
 from tf_transformations import euler_from_quaternion
+from oit_robot_utils.pose_conversions import *
 
 class TfEchoNode(Node):
     def __init__(self, parent_frame, child_frame, rate_hz=10.0):
