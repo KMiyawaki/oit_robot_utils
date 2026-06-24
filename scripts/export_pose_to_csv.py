@@ -25,9 +25,9 @@ class PoseCsvExporter(Node):
         super().__init__('export_pose_to_csv')
         self.buffer = Buffer()
         # Attach a TransformListener to populate the buffer using this node
-        self._tl = TransformListener(self.buffer, self)
+        self.tl = TransformListener(self.buffer, self)
         # Use this node for the pose getter so spin_once operates on the same node
-        self.pose_getter = TFPoseGetter(self, self.buffer, from_frame=parent_frame, to_frame=child_frame)
+        self.pose_getter = TFPoseGetter(self, self.buffer, parent_frame, child_frame, timeout_sec=0.01)
 
 
     def wait_for_pose(self, timeout_sec: float = 10.0):
