@@ -13,8 +13,8 @@ from oit_robot_utils.waypoint_manager import WayPoint, WayPointManager
 
 def calculate_angle(p1: WayPoint, p2: WayPoint, p3: WayPoint) -> float:
     """3つのウェイポイントがなす角度を計算する (p2が角)。0-180度の範囲で返す。"""
-    # ベクトル p1->p2 と p2->p3
-    v1 = (p2.x - p1.x, p2.y - p1.y)
+    # ベクトル p2->p1 と p2->p3
+    v1 = (p1.x - p2.x, p1.y - p2.y)
     v2 = (p3.x - p2.x, p3.y - p2.y)
 
     dot_product = v1[0] * v2[0] + v1[1] * v2[1]
@@ -52,8 +52,8 @@ def parse_args():
     parser.add_argument(
         '--angle-threshold',
         type=float,
-        default=5.0,
-        help='Angle threshold in degrees. Points forming an angle < this are considered straight. (default: 5.0)'
+        default=20.0,
+        help='Angle threshold in degrees. Points forming an angle < this are considered straight. (default: 20.0)'
     )
     parser.add_argument(
         '--min-distance',
@@ -137,7 +137,7 @@ def main():
         next_wp = active_waypoints[i+1]
 
         # 現在の点がなす角の大きさを計算
-        angle = calculate_angle(prev_wp, current_wp, next_wp)
+        angle = 180 - calculate_angle(prev_wp, current_wp, next_wp)
 
         # 最後に保持した点からの距離を計算
         distance = math.hypot(current_wp.x - last_kept_wp.x,
