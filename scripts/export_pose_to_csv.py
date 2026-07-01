@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import math
 import csv
 import datetime
+import math
 import os
 import sys
 import time
@@ -115,7 +115,8 @@ def main():
                     last_id = int(lines[-1].split(',')[0])
                     next_id = last_id + 1
         except Exception as e:
-            node.get_logger().warn(f'Could not read last ID from {filename}: {e}')
+            node.get_logger().warn(
+                f'Could not read last ID from {filename}: {e}')
     elif os.path.exists(filename) and not append:
         node.get_logger().error(f'Output file already exists: {filename}')
         return 1
@@ -134,7 +135,8 @@ def main():
             if count <= 0:
                 node.get_logger().info('Infinite capture mode started. Press Ctrl+C to stop.')
             else:
-                node.get_logger().info(f'Starting to capture {count} waypoints.')
+                node.get_logger().info(
+                    f'Starting to capture {count} waypoints.')
 
             while rclpy.ok():
                 # countが指定されている場合、記録回数に達したらループを抜ける
@@ -158,7 +160,8 @@ def main():
                     # 最初の1点は無条件で記録
                     should_record = True
                 else:
-                    dist = math.hypot(pose.x - last_recorded_pose.x, pose.y - last_recorded_pose.y)
+                    dist = math.hypot(
+                        pose.x - last_recorded_pose.x, pose.y - last_recorded_pose.y)
                     if dist >= distance_threshold:
                         should_record = True
 
@@ -180,7 +183,6 @@ def main():
 
                 # CPU使用率を抑えつつ、ROSのコールバックを処理するための短いスピン
                 rclpy.spin_once(node, timeout_sec=0.1)
-
 
         node.get_logger().info(f'Successfully created/updated CSV: {filename}')
         return 0
