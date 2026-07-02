@@ -8,30 +8,10 @@ import os
 import sys
 import tempfile
 
+import numpy as np
+from rdp import rdp
+
 from oit_robot_utils.waypoint_manager import WayPoint, WayPointManager
-
-
-def calculate_angle(p1: WayPoint, p2: WayPoint, p3: WayPoint) -> float:
-    """3つのウェイポイントがなす角度を計算する (p2が角)。0-180度の範囲で返す。"""
-    # ベクトル p2->p1 と p2->p3
-    v1 = (p1.x - p2.x, p1.y - p2.y)
-    v2 = (p3.x - p2.x, p3.y - p2.y)
-
-    dot_product = v1[0] * v2[0] + v1[1] * v2[1]
-    mag1 = math.hypot(v1[0], v1[1])
-    mag2 = math.hypot(v2[0], v2[1])
-
-    if mag1 == 0 or mag2 == 0:
-        # 点が重なっている場合などは直線とみなし、角度0とする
-        return 0.0
-
-    # 浮動小数点誤差を考慮して値を[-1, 1]の範囲にクランプ
-    cos_theta = max(-1.0, min(1.0, dot_product / (mag1 * mag2)))
-
-    # acosの結果はラジアン [0, pi]
-    angle_rad = math.acos(cos_theta)
-
-    return math.degrees(angle_rad)
 
 
 def parse_args():
@@ -50,29 +30,28 @@ def parse_args():
         help='Overwrite the input file. This flag is ignored if -o is specified.'
     )
     parser.add_argument(
-        '--angle-threshold',
+        '--epsilon',
         type=float,
-        default=20.0,
-        help='Angle threshold in degrees. Points forming an angle < this are considered straight. (default: 20.0)'
+        default=0.1,
+        help='RDP epsilon in meters. (default: 0.1)'
     )
     parser.add_argument(
         '--min-distance',
         type=float,
         default=1.0,
-        help='Minimum distance in meters. Points are kept if distance from last kept point >= this. (default: 1.0)'
+        help='Minimum distance in meters to keep points on straight lines. (default: 1.0)'
     )
     return parser.parse_args()
 
 
 def main():
     """
-    WayPoint CSVをフィルタリングし、不要なポイントをコメントアウトするスクリプト。
-
-    直線上の冗長なウェイポイントを、角度のしきい値と最小距離に基づいて間引きます。
-    カーブ部分は細かくウェイポイントを残し、直線部分は間隔を空けて残します。
+    Ramer-Douglas-Peucker (RDP) アルゴリズムを使用してWayPoint CSVをフィルタリングし、
+    直線上の冗長なウェイポイントをコメントアウトするスクリプト。
+    RDPで軌跡の形状を維持しつつ、直線部分でもウェイポイントが最小距離以上離れないようにします。
 
     usage:
-      ros2 run oit_robot_utils filter_waypoints_csv.py [-h] [-o OUTPUT] [--overwrite] [--angle-threshold ANGLE_THRESHOLD] [--min-distance MIN_DISTANCE] input_csv
+      ros2 run oit_robot_utils filter_waypoints_csv.py [-h] [-o OUTPUT] [--overwrite] [--epsilon EPSILON] [--min-distance MIN_DISTANCE] input_csv
 
     引数:
       input_csv                   入力するWaypoint CSVファイルのパス
@@ -81,10 +60,9 @@ def main():
       -h, --help                  ヘルプメッセージを表示して終了します
       -o OUTPUT, --output OUTPUT  出力CSVファイルのパス。指定しない場合、入力ファイル名に"_filtered"を付けた新しいファイルが作成されます。
       --overwrite                 入力ファイルを上書きします。-oが指定されている場合は無視されます。
-      --angle-threshold ANGLE_THRESHOLD
-                                  角度のしきい値(deg)。この値より小さい変化を持つ点を直線上の点と見なします。(デフォルト: 5.0)
+      --epsilon EPSILON           RDPアルゴリズムの許容誤差(メートル単位)。(デフォルト: 0.1)
       --min-distance MIN_DISTANCE
-                                  最小距離(m)。直線上でも、最後に保持した点からこの距離以上離れていれば維持します。(デフォルト: 1.0)
+                                  直線上で点を維持する最小距離(m)。(デフォルト: 1.0)
 
     実行例:
     1. 新しいファイルに保存 (デフォルト):
@@ -95,7 +73,7 @@ def main():
        $ ros2 run oit_robot_utils filter_waypoints_csv.py path/to/input.csv --overwrite
 
     3. パラメータを指定:
-       $ ros2 run oit_robot_utils filter_waypoints_csv.py input.csv --angle-threshold 10 --min-distance 0.5
+       $ ros2 run oit_robot_utils filter_waypoints_csv.py input.csv --epsilon 0.2 --min-distance 2.0
     """
     args = parse_args()
 
@@ -121,33 +99,38 @@ def main():
 
     active_waypoints = list(manager)
 
-    if len(active_waypoints) < 3:
-        print("Not enough waypoints to filter (requires at least 3). No changes made.")
+    if len(active_waypoints) < 2:
+        print("Not enough waypoints to filter (requires at least 2). No changes made.")
         return 0
 
-    # 保持するウェイポイントのIDを格納するセット
-    # 最初と最後のウェイポイントは常に保持する
-    kept_ids = {active_waypoints[0].id, active_waypoints[-1].id}
-    last_kept_wp = active_waypoints[0]
+    # --- RDPと距離のハイブリッドアプローチでフィルタリング ---
 
-    for i in range(1, len(active_waypoints) - 1):
-        # 局所的な曲がり具合を評価するため、直前・現在・直後の3点を取得
-        prev_wp = active_waypoints[i-1]
-        current_wp = active_waypoints[i]
-        next_wp = active_waypoints[i+1]
+    # 1. RDPアルゴリズムで、軌跡の形状を維持するための主要な点を特定
+    points = np.array([[wp.x, wp.y] for wp in active_waypoints])
+    rdp_mask = rdp(points, epsilon=args.epsilon, return_mask=True)
+    rdp_indices = set(np.where(rdp_mask)[0])
 
-        # 現在の点がなす角の大きさを計算
-        angle = 180 - calculate_angle(prev_wp, current_wp, next_wp)
+    # 2. 直線上で点が離れすぎないように、一定間隔で点を追加
+    kept_ids = set()
+    if active_waypoints:
+        # 最初の点は必ず保持
+        last_kept_wp = active_waypoints[0]
+        kept_ids.add(last_kept_wp.id)
 
-        # 最後に保持した点からの距離を計算
-        distance = math.hypot(current_wp.x - last_kept_wp.x,
-                              current_wp.y - last_kept_wp.y)
+        for i in range(1, len(active_waypoints)):
+            current_wp = active_waypoints[i]
 
-        # 角度がしきい値より大きい（=カーブしている）か、
-        # または距離が最小距離より大きい場合は、このウェイポイントを保持する
-        if angle > args.angle_threshold or distance >= args.min_distance:
-            kept_ids.add(current_wp.id)
-            last_kept_wp = current_wp
+            # RDPで特定された主要点かどうか
+            is_rdp_point = i in rdp_indices
+
+            # 最後に保持した点からの距離
+            distance = math.hypot(current_wp.x - last_kept_wp.x,
+                                  current_wp.y - last_kept_wp.y)
+
+            # RDPの主要点であるか、または最小距離を超えていれば、この点を保持
+            if is_rdp_point or distance >= args.min_distance:
+                kept_ids.add(current_wp.id)
+                last_kept_wp = current_wp
 
     # --- ファイルの書き換え処理 ---
     try:
