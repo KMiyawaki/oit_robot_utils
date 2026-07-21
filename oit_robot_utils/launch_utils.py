@@ -151,7 +151,7 @@ def navigation_nodes(package_name, use_sim_time_conf):
              respawn=True,
              respawn_delay=2.0,
              parameters=params['controller_server.yaml'],
-             remappings=[('cmd_vel', 'cmd_vel_nav')])
+             remappings=[('cmd_vel', 'cmd_vel_nav_raw')])
     controller_server = SimpleNamespace(node=n, name='controller_server')
 
     n = Node(package='nav2_smoother',
@@ -178,7 +178,8 @@ def navigation_nodes(package_name, use_sim_time_conf):
              output='screen',
              respawn=True,
              respawn_delay=2.0,
-             parameters=params['behavior_server.yaml'])
+             parameters=params['behavior_server.yaml'],
+             remappings=[('cmd_vel', 'cmd_vel_nav_raw')])
     behavior_server = SimpleNamespace(node=n, name='behavior_server')
 
     n = Node(package='nav2_bt_navigator',
@@ -206,8 +207,8 @@ def navigation_nodes(package_name, use_sim_time_conf):
              respawn=True,
              respawn_delay=2.0,
              parameters=params['velocity_smoother.yaml'],
-             remappings=[('cmd_vel', 'cmd_vel_nav'),
-                         ('cmd_vel_smoothed', 'cmd_vel')])
+             remappings=[('cmd_vel', 'cmd_vel_nav_raw'),
+                         ('cmd_vel_smoothed', 'cmd_vel_nav')])
     velocity_smoother = SimpleNamespace(node=n, name='velocity_smoother')
 
     return controller_server, smoother_server, planner_server, behavior_server, bt_navigator, waypoint_follower, velocity_smoother
