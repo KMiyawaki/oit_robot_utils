@@ -10,9 +10,8 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
-find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 # -----------------------------------------------------------------------------
 # 2. メッセージ・インターフェースの生成
@@ -41,7 +40,18 @@ find_package(rosidl_default_generators REQUIRED)
 #   DESTINATION lib/${PROJECT_NAME}
 # )
 
-# Pythonライブラリ (oit_cybergear) のインストール
+# C++ 共有ライブラリ(.so)およびヘッダーのインストール
+# install(TARGETS ${PROJECT_NAME}_lib
+#   EXPORT export_${PROJECT_NAME}_lib
+#   ARCHIVE DESTINATION lib
+#   LIBRARY DESTINATION lib
+#   RUNTIME DESTINATION bin
+# )
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+# Pythonライブラリ (oit_robot_utils) のインストール
 ament_python_install_package(${PROJECT_NAME})
 
 # 実行用スクリプト (scripts/*.py, *.sh) のインストール
@@ -61,8 +71,9 @@ install(DIRECTORY config launch
 # -----------------------------------------------------------------------------
 # 5. エクスポートとパッケージ化
 # -----------------------------------------------------------------------------
-
+# C++ 共通ヘッダをエクスポートする
+ament_export_include_directories(include)
 # 他のパッケージがこのメッセージや依存関係を利用できるようにする
-ament_export_dependencies(rclcpp std_msgs angles rosidl_default_runtime)
+ament_export_dependencies(rclpy std_msgs tf2_ros)
 
 ament_package()
