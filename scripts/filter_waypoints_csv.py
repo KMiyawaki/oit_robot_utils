@@ -41,40 +41,16 @@ def parse_args():
         default=1.0,
         help='Minimum distance in meters to keep points on straight lines. (default: 1.0)'
     )
+    parser.add_argument(
+        '--plot',
+        action='store_true',
+        help='Visualize the waypoints before and after filtering.'
+    )
+    
     return parser.parse_args()
 
 
 def main():
-    """
-    Ramer-Douglas-Peucker (RDP) アルゴリズムを使用してWayPoint CSVをフィルタリングし、
-    直線上の冗長なウェイポイントをコメントアウトするスクリプト。
-    RDPで軌跡の形状を維持しつつ、直線部分でもウェイポイントが最小距離以上離れないようにします。
-
-    usage:
-      ros2 run oit_robot_utils filter_waypoints_csv.py [-h] [-o OUTPUT] [--overwrite] [--epsilon EPSILON] [--min-distance MIN_DISTANCE] input_csv
-
-    引数:
-      input_csv                   入力するWaypoint CSVファイルのパス
-
-    オプション引数:
-      -h, --help                  ヘルプメッセージを表示して終了します
-      -o OUTPUT, --output OUTPUT  出力CSVファイルのパス。指定しない場合、入力ファイル名に"_filtered"を付けた新しいファイルが作成されます。
-      --overwrite                 入力ファイルを上書きします。-oが指定されている場合は無視されます。
-      --epsilon EPSILON           RDPアルゴリズムの許容誤差(メートル単位)。(デフォルト: 0.1)
-      --min-distance MIN_DISTANCE
-                                  直線上で点を維持する最小距離(m)。(デフォルト: 1.0)
-
-    実行例:
-    1. 新しいファイルに保存 (デフォルト):
-       (例: input.csv -> input_filtered.csv)
-       $ ros2 run oit_robot_utils filter_waypoints_csv.py path/to/input.csv
-
-    2. 元のファイルを上書き:
-       $ ros2 run oit_robot_utils filter_waypoints_csv.py path/to/input.csv --overwrite
-
-    3. パラメータを指定:
-       $ ros2 run oit_robot_utils filter_waypoints_csv.py input.csv --epsilon 0.2 --min-distance 2.0
-    """
     args = parse_args()
 
     # --- 出力パスの決定 ---
@@ -131,6 +107,42 @@ def main():
             if is_rdp_point or distance >= args.min_distance:
                 kept_ids.add(current_wp.id)
                 last_kept_wp = current_wp
+
+    if args.plot:
+        try:
+            import matplotlib.pyplot as plt
+            
+            # 元の軌跡データ
+            orig_x = [wp.x for wp in active_waypoints]
+            orig_y = [wp.y for wp in active_waypoints]
+            
+            # フィルタリング後の軌跡データ
+            filtered_x = [wp.x for wp in active_waypoints if wp.id in kept_ids]
+            filtered_y = [wp.y for wp in active_waypoints if wp.id in kept_ids]
+            
+            plt.figure(figsize=(10, 8))
+            
+            # 元の点群（グレーで薄く表示）
+            plt.plot(orig_x, orig_y, label='Original Path', color='gray', linestyle='--', alpha=0.6)
+            plt.scatter(orig_x, orig_y, label='Original Points', color='blue', s=15, alpha=0.3)
+            
+            # フィルタリング後の点群（赤で強調して表示）
+            plt.plot(filtered_x, filtered_y, label='Filtered Path', color='red', linewidth=1.5, alpha=0.8)
+            plt.scatter(filtered_x, filtered_y, label='Kept Points', color='red', s=35, zorder=5)
+            
+            plt.title(f'Waypoint Filtering\n(epsilon={args.epsilon}m, min_dist={args.min_distance}m)')
+            plt.xlabel('X (m)')
+            plt.ylabel('Y (m)')
+            plt.legend()
+            plt.axis('equal') # アスペクト比を1:1に固定して形状を正確に表示
+            plt.grid(True)
+            plot_output_path = output_path.replace('.csv', '.png')
+            plt.savefig(plot_output_path) # 画像として保存
+            plt.close() # メモリ解放
+            print(f"Plot image saved to: {plot_output_path}")
+            
+        except ImportError:
+            print("Warning: 'matplotlib' is not installed. Skipping visualization.", file=sys.stderr)
 
     # --- ファイルの書き換え処理 ---
     try:
