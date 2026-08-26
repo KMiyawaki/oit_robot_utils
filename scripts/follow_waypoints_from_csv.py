@@ -5,16 +5,16 @@ import argparse
 from threading import Thread
 
 import rclpy
-from geometry_msgs.msg import PoseWithCovarianceStamped, Twist
 from nav2_simple_commander.robot_navigator import BasicNavigator
-from nav_msgs.msg import Odometry
+from oit_robot_utils.pose_conversions import pose2d_from_amcl, pose_stamped_from
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseWithCovarianceStamped
 
-from oit_robot_utils.pose_conversions import (pose2d_from_amcl,
-                                              pose_stamped_from)
 from oit_robot_utils.waypoint_manager import WayPointManager
 
 
@@ -69,8 +69,7 @@ class NavCommander(Node):
             return
 
         for waypoint in self.waypoints:
-            self.get_logger().info(
-                f'Sending waypoint {waypoint.id}: ({waypoint.x:.3f}, {waypoint.y:.3f}) threshold={waypoint.threshold:.3f}')
+            self.get_logger().info(f'Sending waypoint {waypoint.id}: ({waypoint.x:.3f}, {waypoint.y:.3f}) threshold={waypoint.threshold:.3f}')
             target_pose = pose_stamped_from(
                 waypoint.x,
                 waypoint.y,
@@ -86,12 +85,10 @@ class NavCommander(Node):
                         f'現在位置: x={pose_2d.x:.2f}, y={pose_2d.y:.2f}, theta={pose_2d.theta:.2f}'
                     )
                 feedback = self.nav.getFeedback()
-                distance = feedback.distance_remaining if feedback is not None else float(
-                    'inf')
+                distance = feedback.distance_remaining if feedback is not None else float('inf')
                 self.get_logger().info(f'目標までの距離: {distance:.2f} m')
                 if distance < waypoint.threshold:
-                    self.get_logger().info(
-                        f'WayPoint {waypoint.id} reached by threshold {waypoint.threshold:.3f} m')
+                    self.get_logger().info(f'WayPoint {waypoint.id} reached by threshold {waypoint.threshold:.3f} m')
                     break
                 rate.sleep()
 
