@@ -8,15 +8,15 @@ from typing import Iterable, List, Optional
 
 @dataclass
 class WayPoint:
-    id: int
-    command: str
+    id: str
+    name: str
     x: float
     y: float
     threshold: float
 
     def __str__(self) -> str:
         return (
-            f'WayPoint(id={self.id}, command={self.command}, '
+            f'WayPoint(id={self.id}, name={self.name}, '
             f'x={self.x:.3f}, y={self.y:.3f}, threshold={self.threshold:.3f})'
         )
 
@@ -38,7 +38,7 @@ class WayPointManager:
     def __str__(self) -> str:
         return f'WayPointManager({len(self._waypoints)} waypoints)'
 
-    def get_by_id(self, waypoint_id: int) -> Optional[WayPoint]:
+    def get_by_id(self, waypoint_id: str) -> Optional[WayPoint]:
         return self._by_id.get(waypoint_id)
 
     def nearest(self, x: float, y: float, n: int = 1) -> List[WayPoint]:
@@ -61,8 +61,8 @@ class WayPointManager:
                     raise ValueError(
                         f'Invalid row {row_number} in CSV: expected 5 columns, got {len(row)}'
                     )
-                waypoint_id = int(row[0].strip())
-                command = row[1].strip()
+                waypoint_id = row[0].strip()
+                name = row[1].strip()
                 x = float(row[2].strip())
                 y = float(row[3].strip())
                 threshold = float(row[4].strip())
@@ -70,7 +70,7 @@ class WayPointManager:
                     raise ValueError(
                         f'Duplicate waypoint ID {waypoint_id} in CSV')
                 waypoints.append(
-                    WayPoint(waypoint_id, command, x, y, threshold))
+                    WayPoint(waypoint_id, name, x, y, threshold))
         return cls(waypoints)
 
     @staticmethod
