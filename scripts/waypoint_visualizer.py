@@ -60,7 +60,7 @@ class WayPointVisualizer(Node):
             marker.header.stamp = self.get_clock().now().to_msg()
 
             marker.ns = "waypoints"
-            marker.id = wp.id
+            marker.id = int(wp.id)
 
             marker.type = Marker.SPHERE
             marker.action = Marker.ADD
