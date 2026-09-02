@@ -167,7 +167,7 @@ def main():
                         outfile.write(line)
                         continue
 
-                    waypoint_id = int(row[0].strip())
+                    waypoint_id = row[0].strip()
 
                     if waypoint_id in kept_ids:
                         outfile.write(line)
