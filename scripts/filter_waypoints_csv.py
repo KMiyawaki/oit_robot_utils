@@ -7,6 +7,8 @@ import math
 import os
 import sys
 import tempfile
+import datetime
+import shutil
 
 import numpy as np
 from rdp import rdp
@@ -16,18 +18,13 @@ from oit_robot_utils.waypoint_manager import WayPoint, WayPointManager
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Filter waypoints in a CSV file by commenting out redundant points on straight lines.'
+        description='Filter waypoints in a CSV file by removing redundant points on straight lines.'
     )
     parser.add_argument(
         'input_csv', help='Path to the input waypoint CSV file')
     parser.add_argument(
         '-o', '--output',
-        help='Path to the output CSV file. If not specified, a new file with suffix "_filtered" is created.'
-    )
-    parser.add_argument(
-        '--overwrite',
-        action='store_true',
-        help='Overwrite the input file. This flag is ignored if -o is specified.'
+        help='Path to the output CSV file. If not specified, the input file is overwritten and a backup is created.'
     )
     parser.add_argument(
         '--epsilon',
@@ -42,9 +39,9 @@ def parse_args():
         help='Minimum distance in meters to keep points on straight lines. (default: 1.0)'
     )
     parser.add_argument(
-        '--plot',
+        '--no-plot',
         action='store_true',
-        help='Visualize the waypoints before and after filtering.'
+        help='Disable plotting of the original and filtered waypoints.'
     )
     
     return parser.parse_args()
@@ -52,25 +49,34 @@ def parse_args():
 
 def main():
     args = parse_args()
+    input_path = os.path.abspath(args.input_csv)
 
-    # --- 出力パスの決定 ---
-    if args.output:
-        output_path = args.output
-    elif args.overwrite:
-        output_path = args.input_csv
+    # --- 出力パスの決定とバックアップの作成 ---
+    if not args.output:
+        # デフォルト動作: 上書き ＋ バックアップ
+        output_path = input_path
+        timestamp = input_path.split('/')[-2].replace('_', '')
+        backup_path = f"{input_path}.{timestamp}"
+        
+        try:
+            shutil.copy2(input_path, backup_path)
+            print(f"Backup created at: {backup_path}")
+        except IOError as e:
+            print(f"Error creating backup file: {e}", file=sys.stderr)
+            return 1
     else:
-        base, ext = os.path.splitext(args.input_csv)
-        output_path = f"{base}_filtered{ext}"
+        # 出力先が指定された場合はバックアップを取らずにそこへ出力
+        output_path = os.path.abspath(args.output)
 
     try:
-        manager = WayPointManager.load_csv(args.input_csv)
+        manager = WayPointManager.load_csv(input_path)
     except FileNotFoundError:
         print(
-            f"Error: Input file not found at '{args.input_csv}'", file=sys.stderr)
+            f"Error: Input file not found at '{input_path}'", file=sys.stderr)
         return 1
     except ValueError as e:
         print(
-            f"Error parsing CSV file '{args.input_csv}': {e}", file=sys.stderr)
+            f"Error parsing CSV file '{input_path}': {e}", file=sys.stderr)
         return 1
 
     active_waypoints = list(manager)
@@ -108,7 +114,7 @@ def main():
                 kept_ids.add(current_wp.id)
                 last_kept_wp = current_wp
 
-    if args.plot:
+    if not args.no_plot:
         try:
             import matplotlib.pyplot as plt
             
@@ -136,7 +142,8 @@ def main():
             plt.legend()
             plt.axis('equal') # アスペクト比を1:1に固定して形状を正確に表示
             plt.grid(True)
-            plot_output_path = output_path.replace('.csv', '.png')
+            
+            plot_output_path = os.path.splitext(output_path)[0] + '.png'
             plt.savefig(plot_output_path) # 画像として保存
             plt.close() # メモリ解放
             print(f"Plot image saved to: {plot_output_path}")
@@ -145,18 +152,22 @@ def main():
             print("Warning: 'matplotlib' is not installed. Skipping visualization.", file=sys.stderr)
 
     # --- ファイルの書き換え処理 ---
+    temp_path = None
+
     try:
-        with open(args.input_csv, 'r', newline='', encoding='utf-8') as infile:
+        with open(input_path, 'r', newline='', encoding='utf-8') as infile:
             original_lines = infile.readlines()
 
         temp_fd, temp_path = tempfile.mkstemp(
-            dir=os.path.dirname(os.path.abspath(output_path)))
+            dir=os.path.dirname(output_path)
+        )
 
-        num_commented = 0
+        num_removed = 0
         with os.fdopen(temp_fd, 'w', newline='', encoding='utf-8') as outfile:
             for line in original_lines:
                 stripped_line = line.lstrip()
-                # 空行または既にコメントアウトされている行はそのまま出力
+                
+                # 空行や元のファイルに存在したコメント行はそのまま出力
                 if not stripped_line or stripped_line.startswith('#'):
                     outfile.write(line)
                     continue
@@ -167,27 +178,29 @@ def main():
                         outfile.write(line)
                         continue
 
+                    # IDは文字列として取得
                     waypoint_id = row[0].strip()
 
                     if waypoint_id in kept_ids:
                         outfile.write(line)
                     else:
-                        outfile.write(f'#{line}')
-                        num_commented += 1
+                        # 条件に合わないウェイポイントは削除（ファイルに書き込まない）
+                        num_removed += 1
                 except (ValueError, IndexError):
                     outfile.write(line)
 
         os.replace(temp_path, output_path)
+        temp_path = None  # 移動済みなので削除不要
 
-        print(
-            f"Filtering complete. {num_commented} waypoints were commented out.")
+        print(f"Filtering complete. {num_removed} waypoints were removed.")
         print(f"Result saved to: {output_path}")
 
     except Exception as e:
-        print(
-            f"An error occurred during file processing: {e}", file=sys.stderr)
-        if 'temp_path' in locals() and os.path.exists(temp_path):
+        print(f"An error occurred during file processing: {e}", file=sys.stderr)
+
+        if temp_path is not None and os.path.exists(temp_path):
             os.remove(temp_path)
+
         return 1
 
     return 0
