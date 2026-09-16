@@ -109,8 +109,8 @@ def main():
             distance = math.hypot(current_wp.x - last_kept_wp.x,
                                   current_wp.y - last_kept_wp.y)
 
-            # RDPの主要点であるか、または最小距離を超えていれば、この点を保持
-            if is_rdp_point or distance >= args.min_distance:
+            # RDPの主要点であるか、最小距離を超えているか、または名前が 'goto_point' でない場合、この点を保持
+            if is_rdp_point or distance >= args.min_distance or current_wp.name != 'goto_point':
                 kept_ids.add(current_wp.id)
                 last_kept_wp = current_wp
 
