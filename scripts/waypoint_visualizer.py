@@ -73,10 +73,10 @@ class WayPointVisualizer(Node):
             sphere_marker.pose.position.z = 0.0
 
             sphere_marker.pose.orientation.w = 1.0
-
-            sphere_marker.scale.x = 0.2
-            sphere_marker.scale.y = 0.2
-            sphere_marker.scale.z = 0.2
+            scale = 1.0
+            sphere_marker.scale.x = scale
+            sphere_marker.scale.y = scale
+            sphere_marker.scale.z = scale
 
             sphere_marker.color.r = 1.0
             sphere_marker.color.g = 0.0
@@ -101,18 +101,18 @@ class WayPointVisualizer(Node):
             # 球体の少し上（z = 0.35）に表示
             text_marker.pose.position.x = wp.x
             text_marker.pose.position.y = wp.y
-            text_marker.pose.position.z = 0.35
+            text_marker.pose.position.z = scale * 1.5
 
             # 表示するテキスト（ID）
             text_marker.text = str(wp.id)
 
             # 文字の高さ（スケール）
-            text_marker.scale.z = 0.25
+            text_marker.scale.z = scale
 
             # 文字の色（白色・不透明）
-            text_marker.color.r = 1.0
-            text_marker.color.g = 1.0
-            text_marker.color.b = 1.0
+            text_marker.color.r = 0.0
+            text_marker.color.g = 0.0
+            text_marker.color.b = 0.0
             text_marker.color.a = 1.0
 
             marker_array.markers.append(text_marker)
