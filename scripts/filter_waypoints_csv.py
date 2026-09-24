@@ -55,7 +55,7 @@ def main():
     if not args.output:
         # デフォルト動作: 上書き ＋ バックアップ
         output_path = input_path
-        timestamp = input_path.split('/')[-2].replace('_', '')
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         backup_path = f"{input_path}.{timestamp}"
         
         try:
