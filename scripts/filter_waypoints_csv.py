@@ -3,17 +3,17 @@
 
 import argparse
 import csv
+import datetime
 import math
 import os
+import shutil
 import sys
 import tempfile
-import datetime
-import shutil
 
 import numpy as np
 from rdp import rdp
 
-from oit_robot_utils.waypoint_manager import WayPoint, WayPointManager
+from oit_robot_utils.waypoint_manager import WayPointManager
 
 
 def parse_args():
@@ -43,7 +43,7 @@ def parse_args():
         action='store_true',
         help='Disable plotting of the original and filtered waypoints.'
     )
-    
+
     return parser.parse_args()
 
 
@@ -57,7 +57,7 @@ def main():
         output_path = input_path
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         backup_path = f"{input_path}.{timestamp}"
-        
+
         try:
             shutil.copy2(input_path, backup_path)
             print(f"Backup created at: {backup_path}")
@@ -117,39 +117,45 @@ def main():
     if not args.no_plot:
         try:
             import matplotlib.pyplot as plt
-            
+
             # 元の軌跡データ
             orig_x = [wp.x for wp in active_waypoints]
             orig_y = [wp.y for wp in active_waypoints]
-            
+
             # フィルタリング後の軌跡データ
             filtered_x = [wp.x for wp in active_waypoints if wp.id in kept_ids]
             filtered_y = [wp.y for wp in active_waypoints if wp.id in kept_ids]
-            
+
             plt.figure(figsize=(10, 8))
-            
+
             # 元の点群（グレーで薄く表示）
-            plt.plot(orig_x, orig_y, label='Original Path', color='gray', linestyle='--', alpha=0.6)
-            plt.scatter(orig_x, orig_y, label='Original Points', color='blue', s=15, alpha=0.3)
-            
+            plt.plot(orig_x, orig_y, label='Original Path',
+                     color='gray', linestyle='--', alpha=0.6)
+            plt.scatter(orig_x, orig_y, label='Original Points',
+                        color='blue', s=15, alpha=0.3)
+
             # フィルタリング後の点群（赤で強調して表示）
-            plt.plot(filtered_x, filtered_y, label='Filtered Path', color='red', linewidth=1.5, alpha=0.8)
-            plt.scatter(filtered_x, filtered_y, label='Kept Points', color='red', s=35, zorder=5)
-            
-            plt.title(f'Waypoint Filtering\n(epsilon={args.epsilon}m, min_dist={args.min_distance}m)')
+            plt.plot(filtered_x, filtered_y, label='Filtered Path',
+                     color='red', linewidth=1.5, alpha=0.8)
+            plt.scatter(filtered_x, filtered_y, label='Kept Points',
+                        color='red', s=35, zorder=5)
+
+            plt.title(
+                f'Waypoint Filtering\n(epsilon={args.epsilon}m, min_dist={args.min_distance}m)')
             plt.xlabel('X (m)')
             plt.ylabel('Y (m)')
             plt.legend()
-            plt.axis('equal') # アスペクト比を1:1に固定して形状を正確に表示
+            plt.axis('equal')  # アスペクト比を1:1に固定して形状を正確に表示
             plt.grid(True)
-            
+
             plot_output_path = os.path.splitext(output_path)[0] + '.png'
-            plt.savefig(plot_output_path) # 画像として保存
-            plt.close() # メモリ解放
+            plt.savefig(plot_output_path)  # 画像として保存
+            plt.close()  # メモリ解放
             print(f"Plot image saved to: {plot_output_path}")
-            
+
         except ImportError:
-            print("Warning: 'matplotlib' is not installed. Skipping visualization.", file=sys.stderr)
+            print(
+                "Warning: 'matplotlib' is not installed. Skipping visualization.", file=sys.stderr)
 
     # --- ファイルの書き換え処理 ---
     temp_path = None
@@ -166,7 +172,7 @@ def main():
         with os.fdopen(temp_fd, 'w', newline='', encoding='utf-8') as outfile:
             for line in original_lines:
                 stripped_line = line.lstrip()
-                
+
                 # 空行や元のファイルに存在したコメント行はそのまま出力
                 if not stripped_line or stripped_line.startswith('#'):
                     outfile.write(line)
@@ -196,7 +202,8 @@ def main():
         print(f"Result saved to: {output_path}")
 
     except Exception as e:
-        print(f"An error occurred during file processing: {e}", file=sys.stderr)
+        print(
+            f"An error occurred during file processing: {e}", file=sys.stderr)
 
         if temp_path is not None and os.path.exists(temp_path):
             os.remove(temp_path)
