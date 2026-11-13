@@ -1,5 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from __future__ import annotations
+
 import os
+from collections.abc import Sequence
 from types import SimpleNamespace
+from typing import Any
 
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import Node
@@ -28,7 +34,7 @@ $ ros2 lifecycle nodes
 '''
 
 
-def declare_arg(name, default_value, description="", choices=None):
+def declare_arg(name: str, default_value: Any, description="", choices: Sequence[str] | None = None) -> SimpleNamespace:
     return SimpleNamespace(
         name=name,
         arg=DeclareLaunchArgument(
@@ -36,14 +42,14 @@ def declare_arg(name, default_value, description="", choices=None):
         conf=LaunchConfiguration(name))
 
 
-def if_condition_pyexp(conf, op, value):
-    if type(value) == str:
+def if_condition_pyexp(conf: Any, op: str, value: Any) -> IfCondition:
+    if isinstance(value, str):
         return IfCondition(PythonExpression(["'", conf, "'", op, "'", value, "'"]))
     else:
         return IfCondition(PythonExpression([conf, op, value]))
 
 
-def package_name(file_path):
+def package_name(file_path: str) -> str:
     """ファイルパスからパッケージ名を推定するユーティリティ"""
     # package_name(__file__)
     path = os.path.abspath(file_path)
@@ -55,7 +61,7 @@ def package_name(file_path):
     return os.path.basename(os.path.dirname(file_path))
 
 
-def include_launch(path, **kwargs):
+def include_launch(path: str, **kwargs) -> IncludeLaunchDescription:
     """
     拡張子に応じてSourceを自動選択し、IncludeLaunchDescriptionを返す
     """
@@ -70,37 +76,42 @@ def include_launch(path, **kwargs):
 
 
 class PackagePath:
-    def __init__(self, package_name):
+    def __init__(self, package_name: str) -> None:
         self.pkg_name = package_name
-        self.share_dir = None
+        self.share_dir: str | None = None
 
     @property
-    def package_name(self):
+    def package_name(self) -> str:
         return self.pkg_name
 
     @property
-    def share(self):
+    def share(self) -> str:
         if self.share_dir is None:
             self.share_dir = get_package_share_directory(self.pkg_name)
         return self.share_dir
 
-    def join(self, *args):
+    def join(self, *args: str) -> str:
         return os.path.join(self.share, *args)
 
     @property
-    def maps(self): return self.join('maps')
+    def maps(self) -> str:
+        return self.join('maps')
 
     @property
-    def config(self): return self.join('config')
+    def config(self) -> str:
+        return self.join('config')
 
     @property
-    def config_nav2(self): return self.join('config', 'nav2')
+    def config_nav2(self) -> str:
+        return self.join('config', 'nav2')
 
     @property
-    def rviz(self): return self.join('config', 'rviz')
+    def rviz(self) -> str:
+        return self.join('config', 'rviz')
 
     @property
-    def launch(self): return self.join('launch')
+    def launch(self) -> str:
+        return self.join('launch')
 
 
 def amcl_nodes(package_name, map_path_conf, use_sim_time_conf):
