@@ -40,6 +40,14 @@ def normalize_node_name(node_name: str) -> str:
     return name if name.startswith('/') else f'/{name}'
 
 
+def coerce_type(val: Any, ref: Any) -> Any:
+    if isinstance(ref, float) and isinstance(val, int) and not isinstance(val, bool):
+        return float(val)
+    if isinstance(ref, list) and isinstance(val, list) and len(ref) == len(val):
+        return [coerce_type(v, r) for v, r in zip(val, ref)]
+    return val
+
+
 def set_node_parameter(node: Node, service_name: str, param_name: str, value: Any, timeout_sec: float = 2.0) -> bool:
     """rclpy.parameter.Parameter を利用してパラメータを変更する汎用関数"""
     logger = node.get_logger()
@@ -106,7 +114,7 @@ class ParameterEntry:
         self.fallback = self.normalize(
             fallback) if fallback is not None else None
 
-    def init(self) -> bool:
+    def initialize(self) -> bool:
         """実機からデフォルト値を取得（失敗時はフォールバック）して確定する"""
         if self.initialized:
             return True
@@ -128,13 +136,15 @@ class ParameterEntry:
         return False
 
     def copy_default(self) -> Any:
-        self.init()
+        self.initialize()
         return copy.deepcopy(self.default)
 
     def set(self, value: Any) -> bool:
-        self.init()
+        self.initialize()
         norm_val = self.normalize(value)
-        if self.initialized and self.is_equal(self.current, norm_val):
+        if self.initialized:
+            norm_val = coerce_type(norm_val, self.default)
+        if self.is_equal(self.current, norm_val):
             return True
         if set_node_parameter(self._owner, self._set_srv, self.name, norm_val):
             self.current = norm_val
@@ -195,16 +205,15 @@ class NodeParameterOverride:
 
         entry = self._entries[name]
         if fetch_now:
-            entry.init()
+            entry.initialize()
         return entry
 
     def add_list(self, param_names: list[str]) -> None:
         for p in param_names:
             self.add(p, None, False)
 
-    def initialize(self) -> None:
-        for entry in self._entries.values():
-            entry.init()
+    def initialize(self) -> bool:
+        return all([entry.initialize() for entry in self._entries.values()])
 
     def copy_default(self, name: str) -> Any:
         return self.add(name).copy_default()
@@ -227,11 +236,7 @@ class NodeParameterOverride:
 class ParameterOverrideManager:
     """複数ノードの NodeParameterOverride をノード名キーで統括管理するクラス"""
 
-    def __init__(
-        self,
-        owner_node: Node,
-        fallbacks: dict[tuple[str, str], Any] | None = None,
-    ):
+    def __init__(self, owner_node: Node, fallbacks: dict[tuple[str, str], Any] | None = None):
         self._owner = owner_node
         self._nodes: dict[str, NodeParameterOverride] = {}
 
@@ -259,10 +264,9 @@ class ParameterOverrideManager:
                 self._nodes[key].add(k, fallback=v)
         return self._nodes[key]
 
-    def initialize(self) -> None:
+    def initialize(self) -> bool:
         """登録済み全ノードの全パラメータのデフォルト値を取得・確定する"""
-        for override in self._nodes.values():
-            override.initialize()
+        return all([override.initialize() for override in self._nodes.values()])
 
     def copy_default(self, target_node_name: str, param_name: str) -> Any:
         """デフォルト値のディープコピーを取得する"""

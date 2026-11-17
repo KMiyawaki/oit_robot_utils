@@ -44,7 +44,7 @@ def declare_arg(name: str, default_value: Any, description="", choices: Sequence
 
 def if_condition_pyexp(conf: Any, op: str, value: Any) -> IfCondition:
     if isinstance(value, str):
-        return IfCondition(PythonExpression(["'", conf, "'", op, "'", value, "'"]))
+        return IfCondition(PythonExpression(["'", conf, "' ", op, " '", value, "'"]))
     else:
         return IfCondition(PythonExpression([conf, op, value]))
 

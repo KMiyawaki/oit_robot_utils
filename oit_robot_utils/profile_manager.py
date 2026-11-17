@@ -11,6 +11,8 @@ from oit_robot_utils.node_parameter import (ParameterOverrideManager,
                                             normalize_node_name,
                                             tree_to_flat_dict)
 
+NONE_PROFILE: str = 'none'
+
 
 def load_profile_names(
     yaml_path: str | Path,
@@ -37,10 +39,7 @@ class ProfileManager:
     プロファイル単位での一括適用・リセットを行うステートレスなマネージャ。
     """
 
-    def __init__(
-        self,
-        owner_node: Node
-    ):
+    def __init__(self, owner_node: Node):
         self._owner = owner_node
         self._logger = owner_node.get_logger()
         self._override: ParameterOverrideManager | None = None
@@ -110,8 +109,7 @@ class ProfileManager:
         if self.override_manager is None:
             return False
         """登録済み全パラメータの実機デフォルト値を事前取得する"""
-        self.override_manager.initialize()
-        return True
+        return self.override_manager.initialize()
 
     def apply(self, profile_name: str, reset_first: bool = True) -> bool:
         """
@@ -122,6 +120,8 @@ class ProfileManager:
         if self._override is None:
             self._logger.error(f"Parameters are not loaded")
             return False
+        if profile_name == NONE_PROFILE or not profile_name:
+            return self._override.reset()
         if profile_name not in self._profiles:
             self._logger.error(f"Unknown profile: '{profile_name}'")
             return False
