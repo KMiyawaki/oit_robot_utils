@@ -1,0 +1,74 @@
+# config/nav_profiles.yaml
+# 外部ROSノード（Nav2等）への動的パラメータオーバーライド集約定義
+#
+# --- 機体寸法リファレンス（チューニング基準） ---
+# footprint: [[0.11, 0.22], [0.11, -0.22], [-0.35, -0.22], [-0.35, 0.22]] + padding(0.06)[cite: 1]
+# 実効サイズ : 全長 0.58m (前 0.17m / 後 0.41m) x 全幅 0.56m
+# 内接半径 (r_inscribed)    : 0.28m (これ以下は常に衝突判定=253)
+# 外接半径 (r_circumscribed): 0.50m (後端角までの最大半径。これ以上なら旋回安全)
+
+nav_profiles:
+  # ============================================================================
+  # 必須プロファイル（Python側の NavProfile.ESSENTIAL で起動時検証）
+  # ============================================================================
+  slow:
+    # 徐行区間
+    velocity_smoother:
+      max_velocity: [0.25, 0.0, 0.3490658503988659] # 0.25 m/s, 20 deg/s
+      scale_velocities: true # 旋回半径（曲率）を維持するためスケーリング有効
+
+  blind:
+    # 障害物回避なし＋安全のための標準徐行（隊列追従・誤検知エリア突破など）
+    global_costmap/global_costmap:
+      obstacle_layer:
+        enabled: false
+    local_costmap/local_costmap:
+      obstacle_layer:
+        enabled: false
+    velocity_smoother:
+      max_velocity: [0.25, 0.0, 0.3490658503988659] # 回避なし時は安全のため徐行を標準とする
+      scale_velocities: true
+
+  # ============================================================================
+  # 特殊・状況別プロファイル
+  # ============================================================================
+  blind_fast:
+    # 障害物回避なし・速度制限なし（見通しの良い特殊区間での強行突破・検証用）
+    global_costmap/global_costmap:
+      obstacle_layer:
+        enabled: false
+    local_costmap/local_costmap:
+      obstacle_layer:
+        enabled: false
+
+  near_only:
+    # 遠方障害物無視（人混み・広場で近距離3.0m以内の障害物のみに反応させる）
+    global_costmap/global_costmap:
+      obstacle_layer:
+        scan_low:
+          obstacle_max_range: 3.0
+    local_costmap/local_costmap:
+      obstacle_layer:
+        scan_low:
+          obstacle_max_range: 3.0
+
+  caution:
+    # やや慎重な中速走行（横断歩道・建物内・見通しの悪い通路）
+    velocity_smoother:
+      max_velocity: [0.40, 0.0, 0.5]
+      scale_velocities: true
+
+  narrow:
+    # 狭路・門扉通過用（幅 0.8m〜1.1m 程度のゲート突破）
+    velocity_smoother:
+      max_velocity: [0.35, 0.0, 0.5]
+      scale_velocities: true
+    global_costmap/global_costmap:
+      inflation_layer:
+        # 下限リミット: 内接半径(0.28m) + 最小クリアランス(0.07m) = 0.35m
+        inflation_radius: 0.35
+        cost_scaling_factor: 8.0
+    local_costmap/local_costmap:
+      inflation_layer:
+        inflation_radius: 0.35
+        cost_scaling_factor: 10.0

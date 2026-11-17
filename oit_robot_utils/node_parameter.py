@@ -19,6 +19,27 @@ def declare_and_get(node: Node, name: str, default: T) -> T:
     return cast(T, node.declare_parameter(name, default).value)
 
 
+def tree_to_flat_dict(mapping: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    flatten_param_dict(mapping, '', out)
+    return out
+
+
+def flatten_param_dict(mapping: dict[str, Any], prefix: str, out: dict[str, Any]) -> None:
+    """Nav2 YAML のようなネスト辞書を 'a.b.c': val 形式へ再帰的にフラット化する。"""
+    for key, val in mapping.items():
+        full_key = f'{prefix}.{key}' if prefix else str(key)
+        if isinstance(val, dict):
+            flatten_param_dict(val, full_key, out)
+        else:
+            out[full_key] = val
+
+
+def normalize_node_name(node_name: str) -> str:
+    name = node_name.strip().rstrip('/')
+    return name if name.startswith('/') else f'/{name}'
+
+
 def set_node_parameter(node: Node, service_name: str, param_name: str, value: Any, timeout_sec: float = 2.0) -> bool:
     """rclpy.parameter.Parameter を利用してパラメータを変更する汎用関数"""
     logger = node.get_logger()
@@ -177,6 +198,10 @@ class NodeParameterOverride:
             entry.init()
         return entry
 
+    def add_list(self, param_names: list[str]) -> None:
+        for p in param_names:
+            self.add(p, None, False)
+
     def initialize(self) -> None:
         for entry in self._entries.values():
             entry.init()
@@ -214,18 +239,17 @@ class ParameterOverrideManager:
             for (node_name, param_name), fallback_val in fallbacks.items():
                 self.node(node_name).add(param_name, fallback=fallback_val)
 
-    @staticmethod
-    def _normalize_node_name(node_name: str) -> str:
-        name = node_name.strip().rstrip('/')
-        return name if name.startswith('/') else f'/{name}'
+    def node_from_tree(self, target_node_name: str, tree: dict[str, Any]) -> NodeParameterOverride:
+        params: dict[str, Any] = {}
+        node_name = normalize_node_name(target_node_name)
+        flatten_param_dict(tree, '', params)
+        node_override = self.node(node_name)
+        node_override.add_list(list(params.keys()))
+        return node_override
 
-    def node(
-        self,
-        target_node_name: str,
-        param_name_and_fallbacks: dict[str, Any] | None = None,
-    ) -> NodeParameterOverride:
+    def node(self, target_node_name: str, param_name_and_fallbacks: dict[str, Any] | None = None,) -> NodeParameterOverride:
         """対象ノードの NodeParameterOverride を取得（未登録なら自動生成して登録）"""
-        key = self._normalize_node_name(target_node_name)
+        key = normalize_node_name(target_node_name)
         if key not in self._nodes:
             self._nodes[key] = NodeParameterOverride(
                 self._owner, key, param_name_and_fallbacks
@@ -247,6 +271,13 @@ class ParameterOverrideManager:
     def set(self, target_node_name: str, param_name: str, value: Any) -> bool:
         """ノード名とパラメータ名を指定して値を変更する"""
         return self.node(target_node_name).set(param_name, value)
+
+    def set_params(self, target_node_name: str, param_and_values: dict[str, Any]) -> bool:
+        all_ok: bool = True
+        for k, v in param_and_values.items():
+            if self.set(target_node_name, k, v) == False:
+                all_ok = False
+        return all_ok
 
     def reset(self, target_node_name: str | None = None, param_name: str | None = None) -> bool:
         """指定パラメータ（省略時は対象ノード全体、両方省略時は全ノード全体）をデフォルト値に戻す"""
