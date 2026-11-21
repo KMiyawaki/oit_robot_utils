@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import math
+
 import rclpy
 import rclpy.time
 import tf2_ros
@@ -12,6 +14,22 @@ from nav_msgs.msg import Odometry
 from rclpy.duration import Duration
 from rclpy.node import Node
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
+
+
+def parse_initial_pose(pose_str: str, default: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> tuple[float, float, float]:
+    """'x y yaw_deg' 形式の文字列を (x, y, yaw_rad) に変換する。"""
+    if not pose_str:
+        return default
+    parts = pose_str.strip().strip('"\'').split()
+    if len(parts) < 3:
+        return default
+    try:
+        x = float(parts[0])
+        y = float(parts[1])
+        yaw_rad = math.radians(float(parts[2]))
+        return (x, y, yaw_rad)
+    except ValueError:
+        return default
 
 
 def get_yaw_from_quaternion(orientation: Quaternion) -> float:
