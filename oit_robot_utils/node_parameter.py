@@ -298,6 +298,62 @@ class ParameterOverrideManager:
         return '\n\n'.join(str(override) for override in self._nodes.values())
 
 
+def main2():
+    TARGET_NODE = '/pointcloud_to_laserscan_low'
+    PARAM_MIN_HEIGHT = 'min_height'
+    PARAM_MAX_HEIGHT = 'max_height'
+    PARAM_RANGE_MAX = 'range_max'
+
+    # テスト用の坂道対策パラメータ（地上+0.35m以上、最大距離4.0m）
+    CONE_PARAMS = {
+        PARAM_MIN_HEIGHT: -20.0, # -1.4374,
+        PARAM_RANGE_MAX: 4.0,
+    }
+
+    rclpy.init()
+    node = Node('test_pcl_to_laserscan_override')
+    params = ParameterOverrideManager(node)
+
+    try:
+        params.node(TARGET_NODE, {
+            PARAM_MIN_HEIGHT: -0.2874,
+            PARAM_MAX_HEIGHT: 0.3626,
+            PARAM_RANGE_MAX: 10.0,
+        })
+        if not params.initialize():
+            node.get_logger().error(
+                f'{TARGET_NODE} からパラメータを取得できませんでした。ノード名を確認してください。')
+            return
+
+        print('=== 初期状態（実機デフォルト取得完了） ===')
+        print(params)
+
+        slope_mode = False
+        while rclpy.ok():
+            next_label = 'デフォルト値' if slope_mode else f'坂道テスト値 {CONE_PARAMS}'
+            cmd = input(
+                f'\n[Enter] で「{next_label}」へ切替 / [q + Enter] で終了: ').strip().lower()
+            if cmd == 'q':
+                break
+
+            slope_mode = not slope_mode
+            if slope_mode:
+                params.set_params(TARGET_NODE, CONE_PARAMS)
+                print('>>> 坂道テスト値 適用中:')
+            else:
+                params.reset(TARGET_NODE)
+                print('>>> デフォルト値 復元中:')
+            print(params)
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        print('\n終了処理: デフォルト値へリセットします...')
+        params.reset()
+        node.destroy_node()
+        rclpy.shutdown()
+
+
 def main():
     PARAM_MAX_VELOCITY = 'max_velocity'
     PARAM_MIN_VELOCITY = 'min_velocity'
