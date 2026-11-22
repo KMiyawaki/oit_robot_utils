@@ -9,7 +9,7 @@ import numpy as np
 from builtin_interfaces.msg import Time
 from geometry_msgs.msg import Pose, PoseWithCovarianceStamped
 from rclpy.node import Node
-from sensor_msgs.msg import LaserScan, PointCloud2
+from sensor_msgs.msg import LaserScan, PointCloud2, PointField
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
 from tf_transformations import compose_matrix, euler_from_quaternion
@@ -62,6 +62,75 @@ def apply_tf(points: np.ndarray, tf_matrix: np.ndarray) -> np.ndarray:
 # =============================================================================
 # 2. ROS メッセージ <-> NumPy 点群変換
 # =============================================================================
+
+
+class ColoredPointCloud:
+    """複数の点群・色を蓄積（+= 対応）し、完成済みの PointCloud2 (XYZRGB) を生成するビルダ。"""
+
+    def __init__(self) -> None:
+        self._xyz_chunks: list[np.ndarray] = []
+        self._rgb_chunks: list[np.ndarray] = []
+
+    def add(self, points: np.ndarray, rgb: tuple[int, int, int] | np.ndarray = (255, 0, 0), z: float = 0.0) -> ColoredPointCloud:
+        pts = np.asarray(points, dtype=np.float32)
+        if pts.size == 0:
+            return self
+        if pts.ndim == 1:
+            pts = pts.reshape(1, -1)
+
+        if pts.shape[1] == 2:
+            z_col = np.full((pts.shape[0], 1), z, dtype=np.float32)
+            pts3 = np.hstack((pts, z_col))
+        else:
+            pts3 = pts[:, :3]
+
+        rgb_arr = np.asarray(rgb, dtype=np.uint32)
+        if rgb_arr.ndim == 1:
+            r, g, b = int(rgb_arr[0]) & 0xFF, int(
+                rgb_arr[1]) & 0xFF, int(rgb_arr[2]) & 0xFF
+            packed = np.full(pts3.shape[0], (r << 16) | (
+                g << 8) | b, dtype=np.uint32)
+        else:
+            r = rgb_arr[:, 0] & 0xFF
+            g = rgb_arr[:, 1] & 0xFF
+            b = rgb_arr[:, 2] & 0xFF
+            packed = (r << 16) | (g << 8) | b
+
+        self._xyz_chunks.append(pts3)
+        self._rgb_chunks.append(packed.view(np.float32))
+        return self
+
+    def to_msg(self, frame_id: str = 'map', stamp: Time = Time()) -> PointCloud2:
+        header = Header(frame_id=frame_id, stamp=stamp)
+        fields = [
+            PointField(name='x', offset=0,
+                       datatype=PointField.FLOAT32, count=1),
+            PointField(name='y', offset=4,
+                       datatype=PointField.FLOAT32, count=1),
+            PointField(name='z', offset=8,
+                       datatype=PointField.FLOAT32, count=1),
+            PointField(name='rgb', offset=12,
+                       datatype=PointField.FLOAT32, count=1),
+        ]
+        if not self._xyz_chunks:
+            return point_cloud2.create_cloud(header, fields, [])
+
+        xyz = np.vstack(self._xyz_chunks)
+        rgb_f32 = np.concatenate(self._rgb_chunks).reshape(-1, 1)
+        data = np.hstack((xyz, rgb_f32))
+
+        msg = PointCloud2()
+        msg.header = header
+        msg.height = 1
+        msg.width = data.shape[0]
+        msg.fields = fields
+        msg.is_bigendian = False
+        msg.point_step = 16
+        msg.row_step = 16 * data.shape[0]
+        msg.is_dense = True
+        msg.data = data.tobytes()
+        return msg
+
 
 def scan_to_points(scan_msg: LaserScan | None, min_range: float | None = None) -> np.ndarray:
     """LaserScan の有効ビームをセンサ座標系の 2D 点群 (N, 2) に一括変換する。
