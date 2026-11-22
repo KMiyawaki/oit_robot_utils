@@ -306,7 +306,7 @@ def main2():
 
     # テスト用の坂道対策パラメータ（地上+0.35m以上、最大距離4.0m）
     CONE_PARAMS = {
-        PARAM_MIN_HEIGHT: -20.0, # -1.4374,
+        PARAM_MIN_HEIGHT: -20.0,  # -1.4374,
         PARAM_RANGE_MAX: 4.0,
     }
 

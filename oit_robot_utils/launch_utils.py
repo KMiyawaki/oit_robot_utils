@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import Any
 
@@ -34,7 +33,7 @@ $ ros2 lifecycle nodes
 '''
 
 
-def declare_arg(name: str, default_value: Any, description="", choices: Sequence[str] | None = None) -> SimpleNamespace:
+def declare_arg(name: str, default_value: Any, description="", choices: list[str] | None = None) -> SimpleNamespace:
     return SimpleNamespace(
         name=name,
         arg=DeclareLaunchArgument(
@@ -73,6 +72,37 @@ def include_launch(path: str, **kwargs) -> IncludeLaunchDescription:
         raise ValueError(f"Unsupported launch file extension: {path}")
 
     return IncludeLaunchDescription(source_type(path), **kwargs)
+
+
+def load_initial_pose_from_env(env_name: str) -> dict | None:
+    """環境変数（例: '1.23 -0.45 0.78' または '1.23, -0.45, 0.78'）から
+    AMCL / localization_3d 互換の初期位置パラメータ辞書を生成する。
+    未設定または不正な場合は None を返す。
+    """
+    raw = os.environ.get(env_name, '').strip()
+    if not raw:
+        return None
+    tokens = raw.replace(',', ' ').split()
+    if len(tokens) < 3:
+        print(
+            f"\033[33m[WARN] Invalid {env_name}='{raw}' (expected 'x y yaw')\033[0m")
+        return None
+    try:
+        x, y, yaw = float(tokens[0]), float(tokens[1]), float(tokens[2])
+        print(
+            f"\033[33m[WARN] Loaded initial pose from {env_name}: x={x:.3f}, y={y:.3f}, yaw={yaw:.3f}\033[0m")
+        return {
+            'set_initial_pose': True,
+            'initial_pose': {
+                'x': x,
+                'y': y,
+                'yaw': yaw,
+            }
+        }
+    except ValueError:
+        print(
+            f"\033[33m[WARN] Failed to parse {env_name}='{raw}' as floats\033[0m")
+        return None
 
 
 class PackagePath:
@@ -138,13 +168,13 @@ def amcl_nodes(package_name, map_path_conf, use_sim_time_conf):
 
 def navigation_nodes(package_name, use_sim_time_conf):
     path = PackagePath(package_name)
-    params = {'behavior_server.yaml': None,
-              'bt_navigator.yaml': None,
-              'controller_server.yaml': None,
-              'planner_server.yaml': None,
-              'smoother_server.yaml': None,
-              'velocity_smoother.yaml': None,
-              'waypoint_follower.yaml': None}
+    params: dict[str, Any] = {'behavior_server.yaml': None,
+                              'bt_navigator.yaml': None,
+                              'controller_server.yaml': None,
+                              'planner_server.yaml': None,
+                              'smoother_server.yaml': None,
+                              'velocity_smoother.yaml': None,
+                              'waypoint_follower.yaml': None}
     for k in params.keys():
         yaml = os.path.join(path.config_nav2, k)
         params[k] = [ParameterFile(
