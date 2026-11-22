@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import math
 import os
+from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import Any
 
@@ -74,10 +76,10 @@ def include_launch(path: str, **kwargs) -> IncludeLaunchDescription:
     return IncludeLaunchDescription(source_type(path), **kwargs)
 
 
-def load_initial_pose_from_env(env_name: str) -> dict | None:
-    """環境変数（例: '1.23 -0.45 0.78' または '1.23, -0.45, 0.78'）から
-    AMCL / localization_3d 互換の初期位置パラメータ辞書を生成する。
-    未設定または不正な場合は None を返す。
+def load_initial_pose_from_env(env_name: str, parents: Sequence[str] | None = ('amcl', 'ros__parameters')) -> dict | None:
+    """環境変数（例: '2.44 3.89 71'）から初期位置パラメータ辞書を生成する（yaw は deg -> rad 変換）。
+    parents に親キーの並び（デフォルト: ('amcl', 'ros__parameters')）を指定すると、
+    その階層構造でラップした辞書を返す。None または空を指定するとフラットな辞書を返す。
     """
     raw = os.environ.get(env_name, '').strip()
     if not raw:
@@ -85,20 +87,25 @@ def load_initial_pose_from_env(env_name: str) -> dict | None:
     tokens = raw.replace(',', ' ').split()
     if len(tokens) < 3:
         print(
-            f"\033[33m[WARN] Invalid {env_name}='{raw}' (expected 'x y yaw')\033[0m")
+            f"\033[33m[WARN] Invalid {env_name}='{raw}' (expected 'x y yaw_deg')\033[0m")
         return None
     try:
-        x, y, yaw = float(tokens[0]), float(tokens[1]), float(tokens[2])
+        x, y, yaw_deg = float(tokens[0]), float(tokens[1]), float(tokens[2])
+        yaw_rad = round(math.radians(yaw_deg), 2)
         print(
-            f"\033[33m[WARN] Loaded initial pose from {env_name}: x={x:.3f}, y={y:.3f}, yaw={yaw:.3f}\033[0m")
-        return {
+            f"\033[33m[WARN] Loaded initial pose from {env_name}: x={x:.2f}, y={y:.2f}, yaw={yaw_deg:.0f} deg ({yaw_rad:.2f} rad)\033[0m")
+        result: dict = {
             'set_initial_pose': True,
             'initial_pose': {
                 'x': x,
                 'y': y,
-                'yaw': yaw,
+                'yaw': yaw_rad,
             }
         }
+        if parents:
+            for key in reversed(parents):
+                result = {key: result}
+        return result
     except ValueError:
         print(
             f"\033[33m[WARN] Failed to parse {env_name}='{raw}' as floats\033[0m")
