@@ -35,7 +35,7 @@ class PoseSaverNode(Node):
             return
 
         self.pose_line_re = re.compile(
-            rf'^(\s*export\s+{re.escape(self.env_var_name)}=)(["\']?).*?\2(\s*(?:#.*)?)$'
+            rf'^(\s*)(#\s*)?(export\s+{re.escape(self.env_var_name)}=)(["\']?).*?\4(\s*(?:#.*)?)$'
         )
 
         self.latest_pose: Pose2D | None = None
@@ -66,7 +66,8 @@ class PoseSaverNode(Node):
             return
 
         pose = self.latest_pose
-        pose_str = f'"{pose.x:.2f} {pose.y:.2f} {math.degrees(pose.theta):.1f}"'
+        yaw_deg = int(round(math.degrees(pose.theta)))
+        pose_str = f'"{pose.x:.2f} {pose.y:.2f} {yaw_deg}"'
         if pose_str == self.last_str:
             return
 
@@ -78,18 +79,24 @@ class PoseSaverNode(Node):
             with open(self.file_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
 
-            updated = False
+            handled = False
             new_lines = []
             for line in lines:
-                m = self.pose_line_re.match(line)
-                if m and not updated:
-                    new_lines.append(f'{m.group(1)}{pose_str}{m.group(3)}\n')
-                    updated = True
+                stripped = line.rstrip('\r\n')
+                m = self.pose_line_re.match(stripped)
+                if m and not handled:
+                    if m.group(2) is not None:
+                        return True
+                    new_lines.append(
+                        f'{m.group(1)}{m.group(3)}{pose_str}{m.group(5)}\n')
+                    handled = True
                 else:
                     new_lines.append(line)
 
-            if not updated:
-                new_lines.append(f'\nexport {self.env_var_name}={pose_str}\n')
+            if not handled:
+                if new_lines and not new_lines[-1].endswith('\n'):
+                    new_lines[-1] += '\n'
+                new_lines.append(f'export {self.env_var_name}={pose_str}\n')
 
             dir_name = os.path.dirname(os.path.abspath(self.file_path))
             fd, tmp_path = tempfile.mkstemp(
