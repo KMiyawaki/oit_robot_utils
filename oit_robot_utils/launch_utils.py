@@ -76,7 +76,7 @@ def include_launch(path: str, **kwargs) -> IncludeLaunchDescription:
     return IncludeLaunchDescription(source_type(path), **kwargs)
 
 
-def load_initial_pose_from_env(env_name: str, parents: Sequence[str] | None = ('amcl', 'ros__parameters')) -> dict | None:
+def load_initial_pose_from_env(env_name: str, parents: Sequence[str] | None = None) -> dict | None:
     """環境変数（例: '2.44 3.89 71'）から初期位置パラメータ辞書を生成する（yaw は deg -> rad 変換）。
     parents に親キーの並び（デフォルト: ('amcl', 'ros__parameters')）を指定すると、
     その階層構造でラップした辞書を返す。None または空を指定するとフラットな辞書を返す。
